@@ -2,6 +2,7 @@
   "Parameters": {
     "DeploymentAccount": "976702499515",
     "IAMAccount": "974869829747",
+    "SAMLProviderName": "",
     "isDevelopmentAccount": "false",
     "isPartnerAdminAccessRequired": "false",
     "isPowerUserRequired": "false",
