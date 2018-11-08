@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  IAMAccount:
+    Type: "String"
+    Description: "The 12 digit AWS account number of the IAM account to trust for AssumeRole"
+  StackPrefix:
+    Type: "String"
+    Description: "The prefix to add to resources created by this stack"
+    Default: "gov"
+  FinanceAdminRoleName:
+    Type: "String"
+    Description: "The friendly name for the finance admin role"
+    Default: "financeadmin"
+
+Resources:
+  FinanceAdminPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: !Join ['-', [!Ref StackPrefix, !Ref FinanceAdminRoleName, 'policy']]
+      Description: !Sub "Policy for the Finance admin role"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+            - 'aws-portal:ViewAccount'
+            - 'aws-portal:ViewBilling'
+            - 'aws-portal:ViewPaymentMethods'
+            - 'aws-portal:ViewUsage'
+          Resource:
+            - '*'
+
+  FinanceAdminRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Join ['-', [!Ref StackPrefix, !Ref FinanceAdminRoleName, 'role']]
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS:
+                - !Ref IAMAccount
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Ref FinanceAdminPolicy

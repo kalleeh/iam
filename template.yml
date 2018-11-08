@@ -1,0 +1,604 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IAM Roles/Policies and Groups for cross account user access'
+Parameters:
+  IAMAccount:
+    Type: "String"
+    Description: "The 12 digit AWS account number of the IAM account to trust for AssumeRole (Only use if using IAM Users)"
+  SAMLProviderName:
+    Type: "String"
+    Description: "The SAML Provider Name to trust for AssumeRole if using federation. (Only use if using SAML Federation)"
+  DeploymentAccount:
+    Type: "String"
+    Description: "The 12 digit AWS account number of the Deployment account to trust for AssumeRole"
+  isDevelopmentAccount:
+    Type: "String"
+    Description: "Set to true if developers require full read/write access to this account"
+    Default: "false"
+  isPowerUserRequired:
+    Type: "String"
+    Description: "Set to true if ops users will require full read/write access to this account"
+    Default: "false"
+  isPartnerAdminAccessRequired:
+    Type: "String"
+    Description: "Set to true if Partner should have full admin access to this account"
+    Default: "false"
+  isReadOnlyRequired:
+    Type: "String"
+    Description: "Set to true if this account needs read only access"
+    Default: "false"
+  StackPrefix:
+    Type: "String"
+    Description: "The prefix to add to resources created by this stack"
+    Default: "gov"
+
+Conditions:
+  DeploymentAccount: !Equals [!Ref 'AWS::AccountId', !Ref DeploymentAccount]
+  PowerUserRequired: !Equals [!Ref isPowerUserRequired, "true"] # Used by Ops Team
+  DeveloperAccount: !Equals [!Ref isDevelopmentAccount, "true"] # Used by Devs
+  IAMAccount: !Equals [!Ref 'AWS::AccountId', !Ref IAMAccount] # Configure if using IAM Users
+  SAMLFederation: !Not [ !Equals [!Ref SAMLProviderName, ""] ] # Partner Admin Access
+  ReadOnly: !Equals [!Ref isReadOnlyRequired, "true"] # Generic Read-Only
+  PartnerAccess: !Equals [!Ref isPartnerAdminAccessRequired, "true"] # Partner Admin Access
+
+Resources:
+
+  # Partner Admin Role will be created in all accounts where the PartnerAdminAccess
+  # paramater is set to true. This will allow Partner staff to assume a role into all
+  # these accounts with full administrative rights.
+  PartnerAdminRole:
+    Condition: PartnerAccess
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Join ['-', [!Ref StackPrefix, 'partner-admin-role']]
+      AssumeRolePolicyDocument: !If
+        - SAMLFederation
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated: !Sub arn:aws:iam::${AWS::AccountId}:saml-provider/${SAMLProviderName}
+              Action: sts:AssumeRoleWithSAML
+              Condition:
+                StringEquals:
+                  "SAML:aud": "https://signin.aws.amazon.com/saml"
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                AWS:
+                  - !Ref IAMAccount
+              Action:
+                - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AdministratorAccess"
+        - !Ref LockdownPolicy
+
+  # Administrator and developer roles
+
+  NetAdminRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Join ['-', [!Ref StackPrefix, 'net-admin-role']]
+      AssumeRolePolicyDocument: !If
+        - SAMLFederation
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated: !Sub arn:aws:iam::${AWS::AccountId}:saml-provider/${SAMLProviderName}
+              Action: sts:AssumeRoleWithSAML
+              Condition:
+                StringEquals:
+                  "SAML:aud": "https://signin.aws.amazon.com/saml"
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                AWS:
+                  - !Ref IAMAccount
+              Action:
+                - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/job-function/NetworkAdministrator"
+        - !Ref LockdownPolicy
+
+  DeveloperRole:
+    Condition: DeveloperAccount
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Join ['-', [!Ref StackPrefix, 'developer-role']]
+      AssumeRolePolicyDocument: !If
+        - SAMLFederation
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated: !Sub arn:aws:iam::${AWS::AccountId}:saml-provider/${SAMLProviderName}
+              Action: sts:AssumeRoleWithSAML
+              Condition:
+                StringEquals:
+                  "SAML:aud": "https://signin.aws.amazon.com/saml"
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                AWS:
+                  - !Ref IAMAccount
+              Action:
+                - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/job-function/SystemAdministrator"
+        - !Ref LockdownPolicy
+
+  PowerUserRole:
+    Condition: PowerUserRequired
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Join ['-', [!Ref StackPrefix, 'poweruser-role']]
+      AssumeRolePolicyDocument: !If
+        - SAMLFederation
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated: !Sub arn:aws:iam::${AWS::AccountId}:saml-provider/${SAMLProviderName}
+              Action: sts:AssumeRoleWithSAML
+              Condition:
+                StringEquals:
+                  "SAML:aud": "https://signin.aws.amazon.com/saml"
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                AWS:
+                  - !Ref IAMAccount
+              Action:
+                - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/PowerUserAccess"
+        - !Ref LockdownPolicy
+
+  ReadOnlyRole:
+    Condition: ReadOnly
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Join ['-', [!Ref StackPrefix, 'readonly-role']]
+      AssumeRolePolicyDocument: !If
+        - SAMLFederation
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated: !Sub arn:aws:iam::${AWS::AccountId}:saml-provider/${SAMLProviderName}
+              Action: sts:AssumeRoleWithSAML
+              Condition:
+                StringEquals:
+                  "SAML:aud": "https://signin.aws.amazon.com/saml"
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                AWS:
+                  - !Ref IAMAccount
+              Action:
+                - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/ReadOnlyAccess'
+        - !Ref LockdownPolicy
+
+  # This role will be created in all accounts and will allow
+  # InfoSec staff read-only access to all resources including
+  # logs which have been centrally stored in the audit account
+  InfoSecAuditRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Join ['-', [!Ref StackPrefix, 'infosec-audit-role']]
+      AssumeRolePolicyDocument: !If
+        - SAMLFederation
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated: !Sub arn:aws:iam::${AWS::AccountId}:saml-provider/${SAMLProviderName}
+              Action: sts:AssumeRoleWithSAML
+              Condition:
+                StringEquals:
+                  "SAML:aud": "https://signin.aws.amazon.com/saml"
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                AWS:
+                  - !Ref IAMAccount
+              Action:
+                - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/SecurityAudit"
+        - !Ref LockdownPolicy
+
+  # Deployment admin policies and roles are used to allow users to
+  # create/modify and delete pipelines.
+  DeploymentAdminPolicy:
+    Condition: DeploymentAccount
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: !Join ['-', [!Ref StackPrefix, 'deploymentadmin-policy']]
+      Description: "Allows a Deployment Admin to configure pipelines"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'codepipeline:*'
+              - 'codecommit:*'
+              - 'codebuild:*'
+              - 'codedepoy:*'
+              - 'cloudformation:*'
+              - 'logs:GetEventLogs'
+              - 'events:ListRuleNamesByTarget'
+            Resource: '*'
+
+  DeploymentAdminRole:
+    Condition: DeploymentAccount
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Join ['-', [!Ref StackPrefix, 'deployment-admin-role']]
+      AssumeRolePolicyDocument: !If
+        - SAMLFederation
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated: !Sub arn:aws:iam::${AWS::AccountId}:saml-provider/${SAMLProviderName}
+              Action: sts:AssumeRoleWithSAML
+              Condition:
+                StringEquals:
+                  "SAML:aud": "https://signin.aws.amazon.com/saml"
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                AWS:
+                  - !Ref IAMAccount
+              Action:
+                - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Ref DeploymentAdminPolicy
+        - !Ref LockdownPolicy
+
+# NOTE: Disable if you don't want to allow pipeline viewer access
+#
+# The following groups are only created in the central Deployment account.
+#
+# Deployment viewer policies and roles are used to allow users to
+# view pipeline executions.
+
+  DeploymentViewerPolicy:
+    Condition: DeploymentAccount
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: !Join ['-', [!Ref StackPrefix, 'deploymentviewer-policy']]
+      Description: "Allows a Deployment Viewer to view pipelines"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'codebuild:BatchGet*'
+              - 'codebuild:List*'
+              - 'codepipeline:Get*'
+              - 'codepipeline:List*'
+              - 'events:ListRuleNamesByTarget'
+              - 'logs:GetLogEvents'
+            Resource:
+              - !Join [':', ['arn:aws:codebuild', '*', !Ref 'AWS::AccountId', 'project/*']]
+              - !Join [':', ['arn:aws:codepipeline', '*', !Ref 'AWS::AccountId', '*']]
+              - !Join [':', ['arn:aws:events', '*', !Ref 'AWS::AccountId', 'rule/*']]
+              - !Join [':', ['arn:aws:logs', '*', !Ref 'AWS::AccountId', 'log-group:/aws/codebuild/*']]
+
+  DeploymentViewerRole:
+    Condition: DeploymentAccount
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Join ['-', [!Ref StackPrefix, 'deployment-viewer-role']]
+      AssumeRolePolicyDocument: !If
+        - SAMLFederation
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated: !Sub arn:aws:iam::${AWS::AccountId}:saml-provider/${SAMLProviderName}
+              Action: sts:AssumeRoleWithSAML
+              Condition:
+                StringEquals:
+                  "SAML:aud": "https://signin.aws.amazon.com/saml"
+        -
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                AWS:
+                  - !Ref IAMAccount
+              Action:
+                - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Ref DeploymentViewerPolicy
+        - !Ref LockdownPolicy
+
+  IAMAdminPolicy:
+    Condition: IAMAccount
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: !Join ['-', [!Ref StackPrefix, 'iam-admins', 'policy']]
+      Description: "Policy for the IAM admin role"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+            - 'iam:*'
+          Resource: '*'
+
+  # Lockdown Policy to protect central governance and security resources
+  # This policy should be attached to all roles
+  LockdownPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: !Join ['-', [!Ref StackPrefix, 'lockdown-policy']]
+      Description: "Lockdown policy to protect central resources"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Deny
+          Action:
+            - 'cloudformation:CreateStack'
+            - 'cloudformation:DeleteStack'
+            - 'cloudformation:UpdateStack'
+            - 'iam:AttachRolePolicy'
+            - 'iam:CreatePolicy'
+            - 'iam:CreatePolicyVersion'
+            - 'iam:CreateRole'
+            - 'iam:DeletePolicy'
+            - 'iam:DeletePolicyVersion'
+            - 'iam:DeleteRole'
+            - 'iam:DeleteRolePolicy'
+            - 'iam:DetachRolePolicy'
+            - 'iam:PutRolePolicy'
+            - 'iam:SetDefaultPolicyVersion'
+            - 'iam:UpdateAssumeRolePolicy'
+            - 'iam:UpdateRoleDescription'
+          Resource:
+            - !Join [':', ['arn:aws:cloudformation', !Ref 'AWS::Region', !Ref 'AWS::AccountId', 'stack/adf-*']]
+            - !Join [':', ['arn:aws:cloudformation', !Ref 'AWS::Region', !Ref 'AWS::AccountId', 'stack/gov-*']]
+            - !Join [':', ['arn:aws:iam', '', !Ref 'AWS::AccountId', !Join ['/', ['policy', !Join ['', [!Ref StackPrefix, '*']]]]]]
+            - !Join [':', ['arn:aws:iam', '', !Ref 'AWS::AccountId', !Join ['/', ['role', !Join ['', [!Ref StackPrefix, '*']]]]]]
+            - !Join [':', ['arn:aws:iam', '', !Ref 'AWS::AccountId', 'role/cloudformation-deployment-role']]
+            - !Join [':', ['arn:aws:iam', '', !Ref 'AWS::AccountId', 'role/cloudformation-role']]
+            - !Join [':', ['arn:aws:iam', '', !Ref 'AWS::AccountId', 'role/codecommit-role']]
+
+# NOTE: Disable if you want to use SAML Federation to access AWS accounts!
+#
+# The following groups are only created in the central IAM account.
+# If you are relying on Federation it is recommended to remove these groups
+# since the user assignemnt should be done through federation instead.
+#
+# Groups to be managed through the IAM Account
+
+  IAMAdminGroup:
+    Condition: IAMAccount
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Join ['-', [!Ref StackPrefix, 'iam-admins']]
+      Path: /
+      ManagedPolicyArns:
+        - !Ref IAMAdminPolicy
+
+  DeveloperGroup:
+    Condition: IAMAccount
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Join ['-', [!Ref StackPrefix, 'developers']]
+      Path: /
+      Policies:
+        - PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource:
+                  - !Join 
+                    - ':'
+                    - - 'arn:aws:iam'
+                      - ''
+                      - '*' # Anyone in this group can assume this role in all trusted accounts
+                      - !Join ['/', ['role', !Join ['-', [!Ref StackPrefix, 'developer-role']]]]
+          PolicyName: 'DeveloperAssumePolicy'
+        - PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource:
+                  - !Join 
+                    - ':'
+                    - - 'arn:aws:iam'
+                      - ''
+                      - !Ref DeploymentAccount
+                      - !Join ['/', ['role', !Join ['-', [!Ref StackPrefix, 'deploymentviewer-role']]]]
+          PolicyName: 'DeploymentViewerAssumePolicy'
+
+  FinanceAdminGroup:
+    Condition: IAMAccount
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Join ['-', [!Ref StackPrefix, 'financeadmins']]
+      Path: /
+      Policies:
+        - PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource:
+                  - !Join 
+                    - ':'
+                    - - 'arn:aws:iam'
+                      - ''
+                      - !Ref DeploymentAccount
+                      - !Join ['/', ['role', !Join ['-', [!Ref StackPrefix, 'financeadmin-role']]]]
+          PolicyName: 'FinanceAdminAssumePolicy'
+
+  PowerUserGroup:
+    Condition: IAMAccount
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Join ['-', [!Ref StackPrefix, 'powerusers']]
+      Path: /
+      Policies:
+        - PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource:
+                  - !Join 
+                    - ':'
+                    - - 'arn:aws:iam'
+                      - ''
+                      - '*' # Anyone in this group can assume this role in all trusted accounts
+                      - !Join ['/', ['role', !Join ['-', [!Ref StackPrefix, 'poweruser-role']]]]
+          PolicyName: 'PowerUserAssumePolicy'
+        - PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource:
+                  - !Join 
+                    - ':'
+                    - - 'arn:aws:iam'
+                      - ''
+                      - !Ref DeploymentAccount
+                      - !Join ['/', ['role', !Join ['-', [!Ref StackPrefix, 'deploymentviewer-role']]]]
+          PolicyName: 'DeploymentViewerAssumePolicy'
+
+  ReadOnlyGroup:
+    Condition: IAMAccount
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Join ['-', [!Ref StackPrefix, 'readonly']]
+      Path: /
+      Policies:
+        - PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource:
+                  - !Join 
+                    - ':'
+                    - - 'arn:aws:iam'
+                      - ''
+                      - '*' # Anyone in this group can assume this role in all trusted accounts
+                      - !Join ['/', ['role', !Join ['-', [!Ref StackPrefix, 'readonly-role']]]]
+          PolicyName: 'ReadOnlyAssumePolicy'
+
+  InfoSecGroup:
+    Condition: IAMAccount
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Join ['-', [!Ref StackPrefix, 'infosec']]
+      Path: /
+      Policies:
+        - PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource:
+                  - !Join 
+                    - ':'
+                    - - 'arn:aws:iam'
+                      - ''
+                      - '*' # Anyone in this group can assume this role in all trusted accounts
+                      - !Join ['/', ['role', !Join ['-', [!Ref StackPrefix, 'infosec-role']]]]
+          PolicyName: 'InfoSecAssumePolicy'
+  
+  PartnerAdminGroup:
+    Condition: IAMAccount
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Join ['-', [!Ref StackPrefix, 'partneradmin']]
+      Path: /
+      Policies:
+        - PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource:
+                  - !Join 
+                    - ':'
+                    - - 'arn:aws:iam'
+                      - ''
+                      - '*' # Anyone in this group can assume this role in all trusted accounts
+                      - !Join ['/', ['role', !Join ['-', [!Ref StackPrefix, 'partneradmin-role']]]]
+          PolicyName: 'PartnerAdminAssumePolicy'
+
+  NetworkAdminGroup:
+    Condition: IAMAccount
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Join ['-', [!Ref StackPrefix, 'networkadmins']]
+      Path: /
+      Policies:
+        - PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource:
+                  - !Join 
+                    - ':'
+                    - - 'arn:aws:iam'
+                      - ''
+                      - '*' # Anyone in this group can assume this role in all trusted accounts
+                      - !Join ['/', ['role', !Join ['-', [!Ref StackPrefix, 'networkadminrole']]]]
+          PolicyName: 'NetworkAdminAssumePolicy'
+
+  DeploymentAdminGroup:
+    Condition: IAMAccount
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Join ['-', [!Ref StackPrefix, 'deploymentadmins']]
+      Path: /
+      Policies:
+        - PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource:
+                  - !Join 
+                    - ':'
+                    - - 'arn:aws:iam'
+                      - ''
+                      - !Ref DeploymentAccount
+                      - !Join ['/', ['role', !Join ['-', [!Ref StackPrefix, 'deploymentadmin-role']]]]
+          PolicyName: 'DeploymentAdminAssumePolicy'
+

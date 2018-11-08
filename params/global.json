@@ -1,0 +1,11 @@
+{
+  "Parameters": {
+    "DeploymentAccount": "976702499515",
+    "IAMAccount": "974869829747",
+    "isDevelopmentAccount": "false",
+    "isPartnerAdminAccessRequired": "false",
+    "isPowerUserRequired": "false",
+    "isReadOnlyRequired": "false",
+    "StackPrefix": "gov"
+  }
+}
