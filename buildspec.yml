@@ -3,10 +3,9 @@ version: 0.2
 phases:
   install:
     commands:
-      - aws s3 cp s3://$S3_BUCKET_NAME/build/update_params.py build/update_params.py
-  build:
-    commands:
-      - aws cloudformation validate-template --template-body file://$(pwd)/template.yml
-      - pip install boto3 && python build/update_params.py
+      - export PYTHONPATH=$PWD/adf-build/shared/python
+      - aws s3 cp s3://$S3_BUCKET_NAME/adf-build/ adf-build/ --recursive --quiet
+      - pip install -r adf-build/requirements.txt
+      - python adf-build/generate_params.py
 artifacts:
   files: '**/*'
