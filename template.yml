@@ -403,7 +403,7 @@ Resources:
     Condition: IAMAccount
     Type: AWS::IAM::Group
     Properties:
-      GroupName: !Join ['-', [!Ref StackPrefix, 'iam-admins']]
+      GroupName: !Join ['-', [!Ref StackPrefix, 'iam-admin']]
       Path: /
       ManagedPolicyArns:
         - !Ref IAMAdminPolicy
