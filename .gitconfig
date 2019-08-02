@@ -1,0 +1,6 @@
+[user]
+    email = wallbomk@amazon.com
+
+[credential]
+    helper = !aws --profile adf-code codecommit credential-helper $@
+    UseHttpPath = true

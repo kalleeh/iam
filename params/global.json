@@ -7,6 +7,7 @@
     "isPartnerAdminAccessRequired": "false",
     "isPowerUserRequired": "false",
     "isReadOnlyRequired": "false",
-    "StackPrefix": "gov"
+    "StackPrefix": "resolve:/global/adf/stack-prefix",
+    "BudgetalarmEmail": "account-tag:/buget-owner-email"
   }
 }

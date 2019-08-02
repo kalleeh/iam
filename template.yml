@@ -103,7 +103,7 @@ Resources:
               Action:
                 - "sts:AssumeRole"
       ManagedPolicyArns:
-        - "arn:aws:iam::aws:policy/job-function/NetworkAdministrator"
+        - "arn:aws:iam::aws:policy/job-function/AdministratorAccess"
         - !Ref LockdownPolicy
 
   DeveloperRole:
