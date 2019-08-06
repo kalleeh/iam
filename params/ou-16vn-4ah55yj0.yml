@@ -5,5 +5,4 @@
   isPartnerAdminAccessRequired: 'False'
   isPowerUserRequired: 'False'
   isReadOnlyRequired: 'False'
-  SAMLProviderName: 'idp-provider'
-  BudgetalarmEmail: wallbomk+ou-alert@amazon.com
+  SAMLProviderName: 'idp-provider-special'
