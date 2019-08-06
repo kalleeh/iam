@@ -1,0 +1,10 @@
+Parameters:
+  DeploymentAccount: 976702499515
+  IAMAccount: 974869829747
+  SAMLProviderName: 
+  isDevelopmentAccount: false
+  isPartnerAdminAccessRequired: false
+  isPowerUserRequired: false
+  isReadOnlyRequired: false
+  StackPrefix: resolve:/global/adf/stack-prefix
+  BudgetalarmEmail: wallbomk@amazon.com
