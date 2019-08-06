@@ -5,4 +5,5 @@ Parameters:
   isPartnerAdminAccessRequired: 'False'
   isPowerUserRequired: 'False'
   isReadOnlyRequired: 'False'
+  SAMLProviderName: 'idp-provider'
   BudgetalarmEmail: wallbomk@amazon.com
