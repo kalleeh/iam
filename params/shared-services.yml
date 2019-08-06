@@ -5,4 +5,4 @@
   isPartnerAdminAccessRequired: 'False'
   isPowerUserRequired: 'False'
   isReadOnlyRequired: 'False'
-  SAMLProviderName: 'idp-provider-special'
+  SAMLProviderName: 'idp-provider-shared'
