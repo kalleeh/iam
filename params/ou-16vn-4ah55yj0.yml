@@ -6,5 +6,4 @@ Parameters:
   isPartnerAdminAccessRequired: false
   isPowerUserRequired: false
   isReadOnlyRequired: false
-  StackPrefix: resolve:/global/adf/stack-prefix
   BudgetalarmEmail: wallbomk+ou-alert@amazon.com
